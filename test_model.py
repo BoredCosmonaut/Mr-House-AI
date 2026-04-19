@@ -1,56 +1,38 @@
 import torch
 from unsloth import FastLanguageModel
 
-def chat_with_house():
-    model_path = "house_lora_final"
-    max_seq_length = 2048
-    dtype = torch.bfloat16 # A100 optimized
-    load_in_4bit = False 
-
+def chat():
     model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name = model_path,
-        max_seq_length = max_seq_length,
-        dtype = dtype,
-        load_in_4bit = load_in_4bit,
+        model_name = "house_lora_final",
+        max_seq_length = 2048,
+        dtype = torch.bfloat16,
+        load_in_4bit = False,
     )
-    FastLanguageModel.for_inference(model) 
+    FastLanguageModel.for_inference(model)
 
-    # The same persona instruction used in training
-    instruction = (
-        "You are Robert House, the CEO of RobCo and technocratic overlord of New Vegas. "
-        "Speak with extreme sophistication, cold logic, and a condescending sense of superiority."
-    )
+    # CRITICAL: Define stop tokens
+    terminators = [tokenizer.eos_token_id, tokenizer.convert_tokens_to_ids("<|eot_id|>")]
 
-    print("\nConnection Established\n")
+    instruction = "You are Robert House, CEO of RobCo and overlord of New Vegas. Speak with extreme sophistication and cold logic."
 
     while True:
-        user_input = input("Courier: ")
-        if user_input.lower() in ["exit", "quit", "goodbye"]:
-            print("Mr. House: A pity. I had expected more from you. Don't let the door hit you on your way out of the Lucky 38.")
-            break
-
-        # Format the Llama-3 prompt
-        prompt = (
-            f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{instruction}<|eot_id|>"
-            f"<|start_header_id|>user<|end_header_id|>\n\n{user_input}<|eot_id|>"
-            f"<|start_header_id|>assistant<|end_header_id|>\n\n"
-        )
-
-        inputs = tokenizer([prompt], return_tensors = "pt").to("cuda")
+        u = input("Courier: ")
+        if u.lower() in ["exit", "quit"]: break
         
-        # Generation settings
+        prompt = f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{instruction}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n{u}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+        inputs = tokenizer([prompt], return_tensors = "pt").to("cuda")
+
         outputs = model.generate(
             **inputs, 
-            max_new_tokens = 256,
-            temperature = 0.7, # Adds a bit of variety to his responses
-            use_cache = True
+            max_new_tokens = 150,
+            temperature = 0.4,       # Lower temp = more logic
+            eos_token_id = terminators, 
+            pad_token_id = tokenizer.eos_token_id,
+            repetition_penalty = 1.2
         )
         
-        # Decode only the new tokens (the response)
-        response = tokenizer.batch_decode(outputs)
-        response_text = response[0].split("assistant<|end_header_id|>\n\n")[-1].replace("<|eot_id|>", "").strip()
-        
-        print(f"\nMr. House: {response_text}\n")
+        resp = tokenizer.batch_decode(outputs)[0].split("assistant<|end_header_id|>\n\n")[-1].replace("<|eot_id|>", "").strip()
+        print(f"\nMr. House: {resp}\n")
 
 if __name__ == "__main__":
-    chat_with_house()
+    chat()
