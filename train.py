@@ -23,7 +23,7 @@ def train():
     )
 
     # 2. Load and Split Data
-    # We split 10% for evaluation so the model can check its own progress
+    # split 10% for evaluation
     full_dataset = get_house_dataset("data/dialogueExportVDialogueMrHouse.csv")
     dataset_split = full_dataset.train_test_split(test_size=0.1, seed=3407)
     train_dataset = dataset_split["train"]
@@ -34,7 +34,7 @@ def train():
         model = model,
         tokenizer = tokenizer,
         train_dataset = train_dataset,
-        eval_dataset = eval_dataset, # Required for early stopping
+        eval_dataset = eval_dataset, 
         dataset_text_field = "text",
         max_seq_length = 2048,
         args = TrainingArguments(
@@ -46,12 +46,12 @@ def train():
             logging_steps = 1,
             output_dir = "outputs",
             
-            # --- Early Stopping Requirements ---
-            eval_strategy = "steps",      # Check progress every X steps
+            # Early Stopping Requirements 
+            eval_strategy = "steps",      
             eval_steps = 10,               # How often to run the "exam"
-            save_strategy = "steps",       # Must match eval_strategy
+            save_strategy = "steps",       
             save_steps = 10,
-            load_best_model_at_end = True, # Returns the "best" House, not the last one
+            load_best_model_at_end = True, #
             metric_for_best_model = "loss",
         ),
         # Stop if the loss doesn't improve for 3 checks (30 steps total)

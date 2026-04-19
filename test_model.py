@@ -24,7 +24,7 @@ def chat_with_house():
     print("\nConnection Established\n")
 
     while True:
-        user_input = input("Courier: What do you think of the Brotherhood of Steel?")
+        user_input = input("Courier: ")
         if user_input.lower() in ["exit", "quit", "goodbye"]:
             print("Mr. House: A pity. I had expected more from you. Don't let the door hit you on your way out of the Lucky 38.")
             break
