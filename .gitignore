@@ -1,0 +1,5 @@
+data/
+outputs/
+house_lora_final/
+__pycache__/
+.env
