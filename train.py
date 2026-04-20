@@ -25,7 +25,7 @@ def train():
     )
 
     # 3. Load Data
-    dataset = get_house_dataset("data") # Points to the folder as we discussed
+        dataset = get_house_dataset("data/dialogueExportVDialogueMrHouse.csv")
     dataset_split = dataset.train_test_split(test_size=0.1, seed=3407)
 
     # 4. Training Arguments - THE PRECISION FIX
