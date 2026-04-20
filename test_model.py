@@ -1,12 +1,7 @@
 import torch
-import re
 from unsloth import FastLanguageModel
 
 def chat():
-    # Load Persona
-    with open("persona.txt", "r") as f:
-        instruction = f.read().strip()
-
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name = "house_lora_final",
         max_seq_length = 2048,
@@ -15,12 +10,15 @@ def chat():
     )
     FastLanguageModel.for_inference(model)
 
+    # 1. THE TERMINATOR LIST: Stops the model from running on
     terminators = [
-        tokenizer.eos_token_id, 
+        tokenizer.eos_token_id,
         tokenizer.convert_tokens_to_ids("<|eot_id|>"),
-        tokenizer.convert_tokens_to_ids("<|start_header_id|>")
+        tokenizer.convert_tokens_to_ids("<|start_header_id|>") # Stops it from faking a User reply
     ]
 
+    instruction = ("You are Robert House, the CEO of RobCo and technocratic overlord of New Vegas. "
+                   "Speak with extreme sophistication, cold logic, and condescending superiority.")
 
     while True:
         u = input("Courier: ")
@@ -29,22 +27,24 @@ def chat():
         prompt = f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{instruction}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n{u}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
         inputs = tokenizer([prompt], return_tensors = "pt").to("cuda")
 
+        # 2. INCREASED TOKEN LIMIT & STOP LOGIC
         outputs = model.generate(
             **inputs, 
-            max_new_tokens = 120,
-            temperature = 0.2, # Super low temp to keep him on track
+            max_new_tokens = 256,    # Raised from 120 so he doesn't cut off
+            temperature = 0.3,       # Keeps him logical
+            top_p = 0.9,
+            repetition_penalty = 1.2,
             eos_token_id = terminators, 
             pad_token_id = tokenizer.eos_token_id,
-            repetition_penalty = 1.3, # Higher penalty to stop the "VDialogue" loops
             do_sample = True
         )
         
+        # 3. EXTRACTION
         full_text = tokenizer.batch_decode(outputs)[0]
-        resp = full_text.split("assistant<|end_header_id|>\n\n")[-1].replace("<|eot_id|>", "").strip()
-
-        resp = re.sub(r'VDialogue\w+', '', resp)
-        resp = re.sub(r'<\|.*?\|>', '', resp)
-        resp = resp.replace("GREETING", "").strip()
+        # Grab only what comes after the last assistant header
+        resp = full_text.split("assistant<|end_header_id|>\n\n")[-1]
+        # Clean up any artifacts
+        resp = resp.replace("<|eot_id|>", "").replace("<|begin_of_text|>", "").strip()
         
         print(f"\nMr. House: {resp}\n")
 
