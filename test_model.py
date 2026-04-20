@@ -11,7 +11,11 @@ def chat():
     FastLanguageModel.for_inference(model)
 
     # CRITICAL: Define stop tokens
-    terminators = [tokenizer.eos_token_id, tokenizer.convert_tokens_to_ids("<|eot_id|>")]
+    terminators = [
+    tokenizer.eos_token_id,
+    tokenizer.convert_tokens_to_ids("<|eot_id|>"),
+    tokenizer.convert_tokens_to_ids("<|start_header_id|>"), # Stop if it tries to play the 'user'
+    ]
 
     instruction = "You are Robert House, CEO of RobCo and overlord of New Vegas. Speak with extreme sophistication and cold logic."
 
@@ -24,11 +28,13 @@ def chat():
 
         outputs = model.generate(
             **inputs, 
-            max_new_tokens = 150,
-            temperature = 0.4,       # Lower temp = more logic
-            eos_token_id = terminators, 
+            max_new_tokens = 128,
+            temperature = 0.3,           # Lowered to 0.3 to stop the 'Hidden Valley' confusion
+            top_p = 0.9,
+            repetition_penalty = 1.2,
+            eos_token_id = terminators,   # This is the wall
             pad_token_id = tokenizer.eos_token_id,
-            repetition_penalty = 1.2
+            do_sample = True,
         )
         
         resp = tokenizer.batch_decode(outputs)[0].split("assistant<|end_header_id|>\n\n")[-1].replace("<|eot_id|>", "").strip()

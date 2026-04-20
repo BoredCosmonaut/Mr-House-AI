@@ -33,7 +33,13 @@ def get_house_dataset(csv_path):
         if index == 1:
             if current_input and current_response:
                 full_resp = " ".join(current_response)
-                formatted_data.append({"text": f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{instruction}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n{current_input}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n{full_resp}<|eot_id|>"})
+                formatted_data.append({
+                    "text": (
+                        f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{instruction}<|eot_id|>"
+                        f"<|start_header_id|>user<|end_header_id|>\n\n{current_input.strip()}<|eot_id|>"
+                        f"<|start_header_id|>assistant<|end_header_id|>\n\n{full_response.strip()}<|eot_id|>"
+                    )
+                })
             current_input, current_response = user_text, [house_line]
         else:
             current_response.append(house_line)
