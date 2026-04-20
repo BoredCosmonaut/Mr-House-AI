@@ -23,7 +23,7 @@ def get_house_dataset(csv_path):
         
         # CLEANING: Remove {stage directions} and internal script IDs
         house_line = re.sub(r'\{.*?\}', '', house_line)
-        if "VDialogue" in house_line or "Upgrade" in house_line: # Filter out leaked column names
+        if "VDialogue" in house_line or "Upgrade" in house_line:
             continue
             
         house_line = house_line.strip()
@@ -37,15 +37,22 @@ def get_house_dataset(csv_path):
                     "text": (
                         f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{instruction}<|eot_id|>"
                         f"<|start_header_id|>user<|end_header_id|>\n\n{current_input.strip()}<|eot_id|>"
-                        f"<|start_header_id|>assistant<|end_header_id|>\n\n{full_response.strip()}<|eot_id|>"
+                        f"<|start_header_id|>assistant<|end_header_id|>\n\n{full_resp.strip()}<|eot_id|>" # FIXED variable name
                     )
                 })
             current_input, current_response = user_text, [house_line]
         else:
             current_response.append(house_line)
 
+    # Catch the very last block in the file
     if current_input and current_response:
         full_resp = " ".join(current_response)
-        formatted_data.append({"text": f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{instruction}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n{current_input}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n{full_resp}<|eot_id|>"})
+        formatted_data.append({
+            "text": (
+                f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{instruction}<|eot_id|>"
+                f"<|start_header_id|>user<|end_header_id|>\n\n{current_input.strip()}<|eot_id|>"
+                f"<|start_header_id|>assistant<|end_header_id|>\n\n{full_resp.strip()}<|eot_id|>"
+            )
+        })
 
     return Dataset.from_list(formatted_data)
