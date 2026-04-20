@@ -7,7 +7,6 @@ def get_house_dataset(csv_path):
     if not os.path.exists(csv_path):
         raise FileNotFoundError(f"Data not found at {csv_path}")
 
-    # Ensure we use tab separator for FNVEdit exports
     df = pd.read_csv(csv_path, sep='\t')
     formatted_data = []
     current_input, current_response = "", []
@@ -22,23 +21,26 @@ def get_house_dataset(csv_path):
         # 2. Handle House Response
         house_line = str(row['RESPONSE TEXT'] if pd.notna(row['RESPONSE TEXT']) else "").strip()
         
-        # --- THE FIX: AGGRESSIVE CLEANING ---
-        # Remove {stage directions}
+        # --- THE FIX: SURGICAL CLEANING ---
+        # Remove {stage directions}, [markers], and <|special_tokens|>
         house_line = re.sub(r'\{.*?\}', '', house_line)
-        
-        # Remove [SUCCEEDED], [FAILED], or [LUCK 7] markers
         house_line = re.sub(r'\[.*?\]', '', house_line)
-        
-        # Remove <|reserved_special_token_...|> artifacts
         house_line = re.sub(r'<\|.*?\|>', '', house_line)
         
-        # Remove internal script IDs like VDialogue... or SecuritronUpgrade
-        if any(bad_word in house_line for bad_word in ["VDialogue", "Upgrade", "GREETING"]):
+        # Scrub internal script IDs and meta-tags from the text itself
+        house_line = re.sub(r'VDialogue\w+', '', house_line)
+        house_line = re.sub(r'SecuritronUpgrade\w*', '', house_line)
+        
+        # Kill specific meta-words that trigger hallucinations
+        for word in ["GREETING", "user", "assistant", "Prompt:", "Response:"]:
+            house_line = house_line.replace(word, "")
+        
+        house_line = house_line.strip()
+        
+        # If the line is empty after cleaning, skip it
+        if not house_line or len(house_line) < 2: 
             continue
         # ------------------------------------
-            
-        house_line = house_line.strip()
-        if not house_line or len(house_line) < 2: continue
 
         index = row['RESPONSE INDEX']
         if index == 1:
@@ -55,7 +57,7 @@ def get_house_dataset(csv_path):
         else:
             current_response.append(house_line)
 
-    # Catch the very last block
+    # Final catch for the last block
     if current_input and current_response:
         full_resp = " ".join(current_response)
         formatted_data.append({
