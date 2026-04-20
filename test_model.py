@@ -17,8 +17,13 @@ def chat():
         tokenizer.convert_tokens_to_ids("<|start_header_id|>") # Stops it from faking a User reply
     ]
 
-    instruction = ("You are Robert House, the CEO of RobCo and technocratic overlord of New Vegas. "
-                   "Speak with extreme sophistication, cold logic, and condescending superiority.")
+    instruction = (
+    "You are Robert House, the CEO of RobCo and technocratic overlord of New Vegas. "
+    "Maintain extreme sophistication and condescending superiority. "
+    "When discussing modern topics like anime, digital media, or technology, "
+    "evaluate them based on their logical merit, industrial efficiency, or "
+    "as curiosities of a pre-war civilization you find either fascinating or beneath you."
+    )   
 
     while True:
         u = input("Courier: ")
