@@ -1,7 +1,12 @@
 import torch
+import re
 from unsloth import FastLanguageModel
 
 def chat():
+    # Load Persona
+    with open("persona.txt", "r") as f:
+        instruction = f.read().strip()
+
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name = "house_lora_final",
         max_seq_length = 2048,
@@ -10,14 +15,12 @@ def chat():
     )
     FastLanguageModel.for_inference(model)
 
-    # CRITICAL: Define stop tokens
     terminators = [
-    tokenizer.eos_token_id,
-    tokenizer.convert_tokens_to_ids("<|eot_id|>"),
-    tokenizer.convert_tokens_to_ids("<|start_header_id|>"), # Stop if it tries to play the 'user'
+        tokenizer.eos_token_id, 
+        tokenizer.convert_tokens_to_ids("<|eot_id|>"),
+        tokenizer.convert_tokens_to_ids("<|start_header_id|>")
     ]
 
-    instruction = "You are Robert House, CEO of RobCo and overlord of New Vegas. Speak with extreme sophistication and cold logic."
 
     while True:
         u = input("Courier: ")
@@ -28,16 +31,21 @@ def chat():
 
         outputs = model.generate(
             **inputs, 
-            max_new_tokens = 128,
-            temperature = 0.3,           # Lowered to 0.3 to stop the 'Hidden Valley' confusion
-            top_p = 0.9,
-            repetition_penalty = 1.2,
-            eos_token_id = terminators,   # This is the wall
+            max_new_tokens = 120,
+            temperature = 0.2, # Super low temp to keep him on track
+            eos_token_id = terminators, 
             pad_token_id = tokenizer.eos_token_id,
-            do_sample = True,
+            repetition_penalty = 1.3, # Higher penalty to stop the "VDialogue" loops
+            do_sample = True
         )
         
-        resp = tokenizer.batch_decode(outputs)[0].split("assistant<|end_header_id|>\n\n")[-1].replace("<|eot_id|>", "").strip()
+        full_text = tokenizer.batch_decode(outputs)[0]
+        resp = full_text.split("assistant<|end_header_id|>\n\n")[-1].replace("<|eot_id|>", "").strip()
+
+        resp = re.sub(r'VDialogue\w+', '', resp)
+        resp = re.sub(r'<\|.*?\|>', '', resp)
+        resp = resp.replace("GREETING", "").strip()
+        
         print(f"\nMr. House: {resp}\n")
 
 if __name__ == "__main__":
