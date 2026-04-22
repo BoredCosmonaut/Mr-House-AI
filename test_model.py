@@ -39,15 +39,14 @@ def chat():
         outputs = model.generate(
             **inputs, 
             max_new_tokens = 200, 
-            temperature = 0.15,          # Slightly raised from 0.1 for better flow
-            top_p = 0.8,                 # Gives him a slightly wider vocabulary
-            repetition_penalty = 1.35,   # Stops the "But let us focus..." loops
-            # NEW: Prevents him from repeating common words/phrases too often
-            presence_penalty = 0.6,      
+            temperature = 0.15,
+            top_p = 0.8,
+            repetition_penalty = 1.4,    # Increased slightly to cover the lack of presence_penalty
             eos_token_id = terminators, 
             do_sample = True,
-            max_length = None,
-            use_cache = True
+            max_length = None,           # Keep this to stop the other warning
+            use_cache = True,
+            # Removed presence_penalty to fix the ValueError
         )
         
         full_text = tokenizer.batch_decode(outputs)[0]
