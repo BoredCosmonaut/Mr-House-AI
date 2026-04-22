@@ -41,7 +41,7 @@ def chat():
             eos_token_id = terminators, 
             do_sample = True,
             stop_strings = ["<|reserved", "user", "assistant"],
-            tokenizer = tokenizer
+            tokenizer = tokenizer,
             max_length = None,           # Clear the conflicting default
             use_cache = True             # Speeds up generation
         )
