@@ -46,22 +46,23 @@ def train():
         args = TrainingArguments(
             per_device_train_batch_size = 4,
             gradient_accumulation_steps = 4,
-            max_steps = 250,              # Enough to learn the accent, not the plot
-            learning_rate = 5e-5,         # Lowered for better personality stability
+            max_steps = 250,
+            learning_rate = 5e-5,
             lr_scheduler_type = "cosine",
             warmup_steps = 20,
             bf16 = True,
-            fp16 = False,
             logging_steps = 1,
             eval_strategy = "steps",
             eval_steps = 25,
             save_strategy = "steps",
             save_steps = 25,
             load_best_model_at_end = True,
+            metric_for_best_model = "eval_loss",  # Added
+            greater_is_better = False,            # Added
             output_dir = "outputs",
-            weight_decay = 0.15,          # Starves the game-specific hallucinations
+            weight_decay = 0.15,
             optim = "adamw_8bit",
-            eval_accumulation_steps = 1,
+            report_to = "none",                   # Keeps the console clean
         ),
         callbacks = [EarlyStoppingCallback(early_stopping_patience=4)]
     )
