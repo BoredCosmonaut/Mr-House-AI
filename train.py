@@ -63,6 +63,8 @@ def train():
             output_dir = "outputs",
             weight_decay = 0.1,            # Higher decay to "starve" the bad tokens
             optim = "adamw_8bit",
+            fp16 = False,           # Ensure this is False since you are using bf16
+            eval_accumulation_steps = 1, # Prevents Out-of-Memory during the evaluation phase
         ),
         callbacks = [EarlyStoppingCallback(early_stopping_patience=5)]
     )
