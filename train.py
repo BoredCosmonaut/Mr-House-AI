@@ -24,7 +24,7 @@ def train():
     # This prevents the model from being a "tape recorder" for the game script.
     model = FastLanguageModel.get_peft_model(
         model,
-        r = 32,               
+        r = 16,               
         lora_alpha = 32,      
         target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
         lora_dropout = 0.1,   # Increased dropout to discourage memorization

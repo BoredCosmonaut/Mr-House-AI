@@ -1,9 +1,9 @@
 import torch
 import re
+import random
 import warnings
 from unsloth import FastLanguageModel
 
-# Suppress the deprecation warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 def load_persona(file_path="persona.txt"):
@@ -11,10 +11,26 @@ def load_persona(file_path="persona.txt"):
         with open(file_path, "r", encoding="utf-8") as f:
             return f.read().strip()
     except FileNotFoundError:
-        return "You are Robert House, the technocratic autocrat of New Vegas."
+        return "You are Robert House. Be cold, logical, and arrogant."
+
+def get_random_nudge():
+    """Generates a House-style opening to match the data_loader's variety."""
+    openers = ["From a", "If one considers the", "Evaluating the", "Given the"]
+    subjects = ["logistical", "mathematical", "industrial", "strategic", "logarithmic", "statistical"]
+    perspectives = ["standpoint", "perspective", "angle", "necessity", "framework"]
+    
+    # 20% chance of a blunt or condescending opening
+    if random.random() < 0.2:
+        return random.choice([
+            "To be perfectly blunt, ", 
+            "Let us be clear: ", 
+            "I find the query... interesting. ",
+            "It is a simple matter of calculation: "
+        ])
+    
+    return f"{random.choice(openers)} {random.choice(subjects)} {random.choice(perspectives)}, "
 
 def chat():
-    # Load the model and tokenizer
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name = "house_lora_final",
         max_seq_length = 2048,
@@ -23,72 +39,58 @@ def chat():
     )
     FastLanguageModel.for_inference(model)
 
-    # Set up stopping criteria
+    # Termination tokens to stop him from rambling into game scripts
     terminators = [
         tokenizer.eos_token_id,
         tokenizer.convert_tokens_to_ids("<|eot_id|>"),
-        tokenizer.convert_tokens_to_ids("<|start_header_id|>"),
-        tokenizer.encode("\n", add_special_tokens=False)[-1] # Stop at new lines
+        tokenizer.encode("\n", add_special_tokens=False)[-1],
     ]
     
     instruction = load_persona()
 
     print("\n--- Lucky 38 Mainframe Online ---")
-    print("Type 'exit' to disconnect.\n")
 
     while True:
         u = input("Courier: ")
         if u.lower() in ["exit", "quit"]: break
         
-        # NUDGE: We force the assistant to start with a logical phrase to break the script loop
-        nudge = "From a purely logistical standpoint, "
-        prompt = (
-            f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{instruction}<|eot_id|>"
-            f"<|start_header_id|>user<|end_header_id|>\n\n{u}<|eot_id|>"
-            f"<|start_header_id|>assistant<|end_header_id|>\n\n{nudge}"
-        )
+        # This nudge selection now matches the logic used in your training data
+        nudge = get_random_nudge()
+        prompt = f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{instruction}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n{u}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n{nudge}"
         
         inputs = tokenizer([prompt], return_tensors = "pt").to("cuda")
 
         outputs = model.generate(
             **inputs, 
-            max_new_tokens = 120,        # Concise responses are more 'House'
-            temperature = 0.1,           # Low temp for high logic
-            top_p = 0.8,
-            repetition_penalty = 1.5,    # Hard stop for "......." and script loops
+            max_new_tokens = 90,           # Slightly more room for the varied openings
+            temperature = 0.5,             # Higher temp allows his vocabulary to shine
+            top_p = 0.9,
+            repetition_penalty = 1.25,     # Prevents the "Minty Fresh" collapse
             eos_token_id = terminators, 
             do_sample = True,
-            max_length = None,
             use_cache = True,
         )
         
         full_text = tokenizer.batch_decode(outputs)[0]
-        
-        # Extract the response after our nudge
         resp = full_text.split("assistant<|end_header_id|>\n\n")[-1]
         
-        # --- THE SURGICAL CLEANER ---
-        # 1. Strip special tokens and tech artifacts
+        # --- SURGICAL CLEANER ---
         resp = re.sub(r'<\|.*?\|>', '', resp)
-        resp = resp.replace("assistant", "").replace("user", "").strip()
+        resp = resp.replace("assistant", "").strip()
         
-        # 2. Kill "Lore Leaks" (If he mentions these without you asking, we cut the sentence)
-        lore_triggers = ["Benny", "Hoover Dam", "Platinum Chip", "Kimball", "Salutations", "GREETING"]
+        # Hard-Cut Lore Filter (Backgrounds the game plot)
+        lore_triggers = ["Benny", "Benjamin", "Platinum Chip", "Kimball", "GREETING", "Salutations", "overposting"]
         for trigger in lore_triggers:
             if trigger in resp and trigger not in u:
-                # Cut the response before the hallucinated lore starts
                 resp = resp.split(trigger)[0].strip()
-        
-        # 3. Prevent the Stutter Meltdown
-        if "...." in resp:
-            resp = resp.split("....")[0].strip()
-        
-        # 4. ASCII Polish (Removes ЎыџN symbols)
+
+        # Remove technical artifacts and code leaks
+        resp = re.sub(r'[a-zA-Z]{12,}', '', resp) # Kills long gibberish
+        resp = resp.split("();")[0].split("//")[0].strip() 
+
+        # ASCII Polish and Punctuation Fix
         resp = resp.encode("ascii", "ignore").decode()
-        
-        # 5. Ensure it ends cleanly
-        if resp and resp[-1] not in [".", "!", "?"]:
-            resp += "."
+        if resp and resp[-1] not in [".", "!", "?"]: resp += "."
 
         print(f"\nMr. House: {resp}\n")
 
