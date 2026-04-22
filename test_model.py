@@ -21,10 +21,12 @@ def chat():
     )
     FastLanguageModel.for_inference(model)
 
+    # --- CHANGE 1: ADD NEWLINE TERMINATOR ---
     terminators = [
         tokenizer.eos_token_id,
         tokenizer.convert_tokens_to_ids("<|eot_id|>"),
-        tokenizer.convert_tokens_to_ids("<|start_header_id|>")
+        tokenizer.convert_tokens_to_ids("<|start_header_id|>"),
+        tokenizer.encode("\n", add_special_tokens=False)[-1] 
     ]
     
     instruction = load_persona()
@@ -36,17 +38,17 @@ def chat():
         prompt = f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{instruction}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n{u}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
         inputs = tokenizer([prompt], return_tensors = "pt").to("cuda")
 
+        # --- CHANGE 2 & 3: TIGHTEN LIMITS ---
         outputs = model.generate(
             **inputs, 
-            max_new_tokens = 200, 
-            temperature = 0.15,
+            max_new_tokens = 120,        # Reduced to keep him concise
+            temperature = 0.1,           # Dropped slightly for maximum logic
             top_p = 0.8,
-            repetition_penalty = 1.4,    # Increased slightly to cover the lack of presence_penalty
+            repetition_penalty = 1.5,    # Increased to kill the "........" stuttering
             eos_token_id = terminators, 
             do_sample = True,
-            max_length = None,           # Keep this to stop the other warning
+            max_length = None,
             use_cache = True,
-            # Removed presence_penalty to fix the ValueError
         )
         
         full_text = tokenizer.batch_decode(outputs)[0]
@@ -56,8 +58,12 @@ def chat():
         resp = re.sub(r'<\|.*?\|>', '', resp)
         resp = resp.replace("assistant", "").replace("user", "").strip()
         
-        # ASCII cleaning to remove non-printable game characters (ЎыџN)
+        # ASCII cleaning (removes the weird ЎыџN symbols)
         resp = resp.encode("ascii", "ignore").decode()
+
+        # Final polish: stop at the first sign of a halluciantion-style repeat
+        if "\n" in resp:
+            resp = resp.split("\n")[0]
 
         print(f"\nMr. House: {resp}\n")
 

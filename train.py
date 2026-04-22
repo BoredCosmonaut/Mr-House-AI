@@ -7,14 +7,12 @@ from transformers import TrainingArguments, EarlyStoppingCallback
 from src.data_loader import get_house_dataset
 
 def train():
-    # --- STEP 0: THE PURGE ---
-    # Delete old folders to ensure no leftover "dirty" weights interfere
+    # Clear old weights
     for folder in ["outputs", "house_lora_final"]:
         if os.path.exists(folder):
             shutil.rmtree(folder)
-            print(f"Deleted old folder: {folder}")
 
-    # 1. Load Model
+    # 1. Load Model (A100 optimized)
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name = "unsloth/llama-3-8b",
         max_seq_length = 2048,
@@ -22,23 +20,22 @@ def train():
         load_in_4bit = False,
     )
 
-    # 2. THE STABILIZER: Lower Rank (64) prevents "Script Memorization"
-    # This forces the model to be creative rather than just repeating the CSV.
+    # 2. THE STABILIZER (r=32)
+    # This prevents the model from being a "tape recorder" for the game script.
     model = FastLanguageModel.get_peft_model(
         model,
-        r = 64,               # Reduced from 128
-        lora_alpha = 64,      # Reduced from 128
+        r = 32,               
+        lora_alpha = 32,      
         target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
-        lora_dropout = 0.05,  # Added a tiny bit of dropout to prevent overfitting
+        lora_dropout = 0.1,   # Increased dropout to discourage memorization
         bias = "none",
     )
 
-    # 3. Load Data (USE A NEW FILENAME IF YOU RENAMED YOUR CLEAN CSV)
-    # Pro-tip: Rename your CSV to 'house_v2_clean.csv' to bypass the disk cache.
+    # 3. Load Data
     dataset = get_house_dataset("data/house_v2_clean.csv") 
     dataset_split = dataset.train_test_split(test_size=0.1, seed=3407)
 
-    # 4. Training Arguments - QUALITY OVER QUANTITY
+    # 4. Training Arguments
     trainer = SFTTrainer(
         model = model,
         tokenizer = tokenizer,
@@ -49,32 +46,32 @@ def train():
         args = TrainingArguments(
             per_device_train_batch_size = 4,
             gradient_accumulation_steps = 4,
-            max_steps = 200,               # Reduced from 400 (prevent playback loop)
-            learning_rate = 1e-4,          # Slightly higher LR to learn the "accent" faster
+            max_steps = 250,              # Enough to learn the accent, not the plot
+            learning_rate = 5e-5,         # Lowered for better personality stability
             lr_scheduler_type = "cosine",
-            warmup_steps = 10,
+            warmup_steps = 20,
             bf16 = True,
+            fp16 = False,
             logging_steps = 1,
             eval_strategy = "steps",
-            eval_steps = 20,
+            eval_steps = 25,
             save_strategy = "steps",
-            save_steps = 20,
+            save_steps = 25,
             load_best_model_at_end = True,
             output_dir = "outputs",
-            weight_decay = 0.1,            # Higher decay to "starve" the bad tokens
+            weight_decay = 0.15,          # Starves the game-specific hallucinations
             optim = "adamw_8bit",
-            fp16 = False,           # Ensure this is False since you are using bf16
-            eval_accumulation_steps = 1, # Prevents Out-of-Memory during the evaluation phase
+            eval_accumulation_steps = 1,
         ),
-        callbacks = [EarlyStoppingCallback(early_stopping_patience=5)]
+        callbacks = [EarlyStoppingCallback(early_stopping_patience=4)]
     )
 
-    print("--- House is scanning for system corruption... ---")
+    print("--- Calculating the House Advantage... ---")
     trainer.train()
     
     model.save_pretrained("house_lora_final")
     tokenizer.save_pretrained("house_lora_final")
-    print("--- Training Complete. The Lucky 38 is running a clean OS. ---")
+    print("--- Training Complete. System logic is pure. ---")
 
 if __name__ == "__main__":
     train()
