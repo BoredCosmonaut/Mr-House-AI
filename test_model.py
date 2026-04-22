@@ -11,23 +11,19 @@ def chat():
     )
     FastLanguageModel.for_inference(model)
 
-    # 1. THE KILL SWITCH: If the model says these, it stops instantly.
-    # This prevents the "Reserved Token" stuttering from filling your screen.
     terminators = [
         tokenizer.eos_token_id,
         tokenizer.convert_tokens_to_ids("<|eot_id|>"),
         tokenizer.convert_tokens_to_ids("<|start_header_id|>")
     ]
     
-    stop_words = ["<|reserved", "user", "assistant", "GREETING", "VDialogue"]
+    # SYSTEM PROMPT: Now includes 'Temporal Grounding'
+    def load_persona(file_path="persona.txt"):
+        with open(file_path, "r", encoding="utf-8") as f:
+            return f.read().strip()
 
-    # STAMP: Ensure this matches your training script exactly
-    instruction = (
-        "You are Robert House, the CEO of RobCo and technocratic overlord of New Vegas. "
-        "Maintain extreme sophistication and condescending superiority. "
-        "Do not use game script markers, internal tags, or system metadata. "
-        "Evaluate all topics based on logical merit or industrial efficiency."
-    )   
+    # Then use it like this:
+    instruction = load_persona()
 
     while True:
         u = input("Courier: ")
@@ -38,30 +34,32 @@ def chat():
 
         outputs = model.generate(
             **inputs, 
-            max_new_tokens = 256,
-            temperature = 0.2,       # DROPPED: Makes him more predictable/stable
-            top_p = 0.9,
-            repetition_penalty = 1.2,
+            max_new_tokens = 150,    # Kept concise to prevent rambling
+            temperature = 0.1,       # EXTREMELY LOW: Prevents "Fan-Fiction" drift
+            top_p = 0.7,
+            repetition_penalty = 1.3,
             eos_token_id = terminators, 
-            pad_token_id = tokenizer.eos_token_id,
             do_sample = True,
-            # NEW: Hardware-level stop
-            stop_strings = stop_words, 
+            stop_strings = ["<|reserved", "user", "assistant"],
             tokenizer = tokenizer
+            max_length = None,           # Clear the conflicting default
+            use_cache = True             # Speeds up generation
         )
         
         full_text = tokenizer.batch_decode(outputs)[0]
         resp = full_text.split("assistant<|end_header_id|>\n\n")[-1]
         
-        # --- FINAL SURGICAL SCRUB ---
-        # Even if the model generates it, we don't let the user see it.
+        # --- THE CLEANER ---
         resp = re.sub(r'<\|.*?\|>', '', resp)
-        resp = re.sub(r'VDialogue\w+', '', resp)
         resp = resp.replace("assistant", "").replace("user", "").strip()
         
-        # Remove the stuttering ЎыџN symbols if they survive
-        resp = resp.encode("ascii", "ignore").decode()
-        
+        # --- HALLUCINATION CHECK ---
+        # If he starts talking about Kimball/Caesar and you DIDN'T, 
+        # he's likely hallucinating game scripts. 
+        if "Kimball" in resp and "Kimball" not in u:
+            # Subtle nudge back to reality
+            resp = resp.split(".")[0] + ". But let us focus on your current query."
+
         print(f"\nMr. House: {resp}\n")
 
 if __name__ == "__main__":

@@ -57,16 +57,17 @@ def get_house_dataset(csv_path):
         index = row['RESPONSE INDEX']
         if index == 1:
             if current_input and current_response:
-                full_resp = " ".join(current_response)
-                # Final safety check: Make sure House isn't quoting technical IDs
-                if len(full_resp) > 5:
-                    formatted_data.append({
-                        "text": (
-                            f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{instruction}<|eot_id|>"
-                            f"<|start_header_id|>user<|end_header_id|>\n\n{current_input}<|eot_id|>"
-                            f"<|start_header_id|>assistant<|end_header_id|>\n\n{full_resp.strip()}<|eot_id|>"
-                        )
-                    })
+                # LIMITER: Only take the first 3 sentences of a House response
+                # This prevents the model from learning "Rambling" behavior.
+                full_resp = " ".join(current_response[:3]) 
+                
+                formatted_data.append({
+                    "text": (
+                        f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{instruction}<|eot_id|>"
+                        f"<|start_header_id|>user<|end_header_id|>\n\n{current_input}<|eot_id|>"
+                        f"<|start_header_id|>assistant<|end_header_id|>\n\n{full_resp.strip()}<|eot_id|>"
+                    )
+                })
             current_input, current_response = user_text, [house_line]
         else:
             current_response.append(house_line)
