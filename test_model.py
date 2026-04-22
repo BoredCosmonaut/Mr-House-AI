@@ -1,6 +1,16 @@
 import torch
 import re
+import warnings
 from unsloth import FastLanguageModel
+
+warnings.filterwarnings("ignore", category=FutureWarning)
+
+def load_persona(file_path="persona.txt"):
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        return "You are Robert House, CEO of RobCo."
 
 def chat():
     model, tokenizer = FastLanguageModel.from_pretrained(
@@ -17,12 +27,6 @@ def chat():
         tokenizer.convert_tokens_to_ids("<|start_header_id|>")
     ]
     
-    # SYSTEM PROMPT: Now includes 'Temporal Grounding'
-    def load_persona(file_path="persona.txt"):
-        with open(file_path, "r", encoding="utf-8") as f:
-            return f.read().strip()
-
-    # Then use it like this:
     instruction = load_persona()
 
     while True:
@@ -34,31 +38,27 @@ def chat():
 
         outputs = model.generate(
             **inputs, 
-            max_new_tokens = 150,    # Kept concise to prevent rambling
-            temperature = 0.1,       # EXTREMELY LOW: Prevents "Fan-Fiction" drift
-            top_p = 0.7,
-            repetition_penalty = 1.3,
+            max_new_tokens = 200, 
+            temperature = 0.15,          # Slightly raised from 0.1 for better flow
+            top_p = 0.8,                 # Gives him a slightly wider vocabulary
+            repetition_penalty = 1.35,   # Stops the "But let us focus..." loops
+            # NEW: Prevents him from repeating common words/phrases too often
+            presence_penalty = 0.6,      
             eos_token_id = terminators, 
             do_sample = True,
-            stop_strings = ["<|reserved", "user", "assistant"],
-            tokenizer = tokenizer,
-            max_length = None,           # Clear the conflicting default
-            use_cache = True             # Speeds up generation
+            max_length = None,
+            use_cache = True
         )
         
         full_text = tokenizer.batch_decode(outputs)[0]
         resp = full_text.split("assistant<|end_header_id|>\n\n")[-1]
         
-        # --- THE CLEANER ---
+        # Clean technical artifacts
         resp = re.sub(r'<\|.*?\|>', '', resp)
         resp = resp.replace("assistant", "").replace("user", "").strip()
         
-        # --- HALLUCINATION CHECK ---
-        # If he starts talking about Kimball/Caesar and you DIDN'T, 
-        # he's likely hallucinating game scripts. 
-        if "Kimball" in resp and "Kimball" not in u:
-            # Subtle nudge back to reality
-            resp = resp.split(".")[0] + ". But let us focus on your current query."
+        # ASCII cleaning to remove non-printable game characters (ЎыџN)
+        resp = resp.encode("ascii", "ignore").decode()
 
         print(f"\nMr. House: {resp}\n")
 
