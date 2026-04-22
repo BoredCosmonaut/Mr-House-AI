@@ -35,7 +35,8 @@ def chat():
         u = input("Courier: ")
         if u.lower() in ["exit", "quit"]: break
         
-        prompt = f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{instruction}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n{u}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+        # This forces the model to start with a "Thinking" posture instead of a "Script" posture
+        prompt = f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{instruction}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n{u}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\nTo be blunt, "
         inputs = tokenizer([prompt], return_tensors = "pt").to("cuda")
 
         # --- CHANGE 2 & 3: TIGHTEN LIMITS ---
