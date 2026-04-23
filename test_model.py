@@ -1,9 +1,12 @@
 import torch
 import re
 import warnings
+import logging
 from unsloth import FastLanguageModel
 
-warnings.filterwarnings("ignore", category=FutureWarning)
+# 1. Kill the logs at the root
+warnings.filterwarnings("ignore")
+logging.getLogger("transformers").setLevel(logging.ERROR)
 
 def load_persona(file_path="persona.txt"):
     try:
@@ -21,6 +24,10 @@ def chat():
     )
     FastLanguageModel.for_inference(model)
 
+    # --- THE WARNING KILLER ---
+    # This removes the internal max_length default entirely
+    model.generation_config.max_length = None 
+    
     terminators = [
         tokenizer.eos_token_id,
         tokenizer.convert_tokens_to_ids("<|eot_id|>"),
@@ -28,8 +35,7 @@ def chat():
     ]
     
     instruction = load_persona()
-
-    print("\n--- Lucky 38 Mainframe Online ---")
+    print("\n--- Lucky 38 Mainframe Online ---\n")
 
     while True:
         u = input("Courier: ")
@@ -45,11 +51,10 @@ def chat():
 
         outputs = model.generate(
             **inputs, 
-            max_new_tokens = 128,           # More room prevents abrupt cuts
-            max_length = 2048,             # KILLS THE WARNING
-            temperature = 0.4,             # LOWER temp prevents him from switching identities
+            max_new_tokens = 128,
+            temperature = 0.35,            # Slightly lower to prevent "Mormon Kimball" style hallucinations
             top_p = 0.9,
-            repetition_penalty = 1.3,     # HIGHER penalty kills "igator" and loops
+            repetition_penalty = 1.3,     # Keeps the logic on track
             eos_token_id = terminators, 
             do_sample = True,
             use_cache = True,
@@ -61,25 +66,19 @@ def chat():
         # --- CLEANING ---
         resp = re.sub(r'<\|.*?\|>', '', resp).strip()
         
-        # Identity Lock: If he starts talking like a technician/worker, cut it.
-        worker_leaks = ["NCR", "headquarters", "program", "manual", "restrictions", "override", "working at"]
-        for leak in worker_leaks:
-            if leak in resp.lower() and leak not in u.lower():
-                resp = resp.split(leak)[0].strip()
-
-        # Artifact Cleaner
-        resp = re.sub(r'igator|user|assistant|Courier', '', resp, flags=re.IGNORECASE)
-        resp = re.sub(r'[a-zA-Z]{15,}', '', resp) 
-
-        # Sentence Trimmer (The part you liked!)
+        # Trim half-finished sentences
         if " " in resp:
             last_punc = max(resp.rfind("."), resp.rfind("!"), resp.rfind("?"))
             if last_punc != -1:
                 resp = resp[:last_punc + 1]
 
+        # Prevent "Narrator Leaks" (when the AI starts talking about the character)
+        if "House" in resp and "I" not in resp:
+            resp = resp.split("House")[0].strip()
+
         resp = resp.encode("ascii", "ignore").decode().strip()
 
-        if not resp or len(resp) < 5:
+        if not resp:
             resp = "The question is irrelevant. My plans for the future do not concern such trivialities."
 
         print(f"\nMr. House: {resp}\n")
