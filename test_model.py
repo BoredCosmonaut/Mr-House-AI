@@ -13,7 +13,6 @@ def load_persona(file_path="persona.txt"):
         return "You are Robert House. Be cold, logical, and arrogant."
 
 def chat():
-    # Load the model
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name = "house_lora_final",
         max_seq_length = 2048,
@@ -22,7 +21,6 @@ def chat():
     )
     FastLanguageModel.for_inference(model)
 
-    # Set up termination tokens
     terminators = [
         tokenizer.eos_token_id,
         tokenizer.convert_tokens_to_ids("<|eot_id|>"),
@@ -32,13 +30,11 @@ def chat():
     instruction = load_persona()
 
     print("\n--- Lucky 38 Mainframe Online ---")
-    print("Mannerism Protocol: Organic (No Nudges)\n")
 
     while True:
         u = input("Courier: ")
         if u.lower() in ["exit", "quit"]: break
         
-        # NUDGES REMOVED: The assistant block is now empty to let the model decide the start
         prompt = (
             f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{instruction}<|eot_id|>"
             f"<|start_header_id|>user<|end_header_id|>\n\n{u}<|eot_id|>"
@@ -49,43 +45,43 @@ def chat():
 
         outputs = model.generate(
             **inputs, 
-            max_new_tokens = 90,           
-            temperature = 0.6,             # Slightly higher for more organic vocabulary
+            max_new_tokens = 128,           # More room prevents abrupt cuts
+            max_length = 2048,             # KILLS THE WARNING
+            temperature = 0.4,             # LOWER temp prevents him from switching identities
             top_p = 0.9,
-            repetition_penalty = 1.2,     
+            repetition_penalty = 1.3,     # HIGHER penalty kills "igator" and loops
             eos_token_id = terminators, 
             do_sample = True,
             use_cache = True,
         )
         
         full_text = tokenizer.batch_decode(outputs)[0]
-        # Split exactly at the assistant header
         resp = full_text.split("assistant<|end_header_id|>\n\n")[-1]
         
         # --- CLEANING ---
-        # Remove leftover technical tags
-        resp = re.sub(r'<\|.*?\|>', '', resp)
-        resp = resp.replace("assistant", "").strip()
+        resp = re.sub(r'<\|.*?\|>', '', resp).strip()
         
-        # Hard-Cut Lore Filter (Still needed to catch script-playback)
-        lore_triggers = ["Benny", "Benjamin", "Platinum Chip", "Kimball", "GREETING", "Salutations", "overposting"]
-        for trigger in lore_triggers:
-            if trigger in resp and trigger not in u:
-                resp = resp.split(trigger)[0].strip()
+        # Identity Lock: If he starts talking like a technician/worker, cut it.
+        worker_leaks = ["NCR", "headquarters", "program", "manual", "restrictions", "override", "working at"]
+        for leak in worker_leaks:
+            if leak in resp.lower() and leak not in u.lower():
+                resp = resp.split(leak)[0].strip()
 
-        # Remove gibberish and code leaks
+        # Artifact Cleaner
+        resp = re.sub(r'igator|user|assistant|Courier', '', resp, flags=re.IGNORECASE)
         resp = re.sub(r'[a-zA-Z]{15,}', '', resp) 
-        resp = resp.split("();")[0].split("//")[0].strip() 
 
-        # Final Polish
-        resp = resp.encode("ascii", "ignore").decode()
-        if resp and resp[-1] not in [".", "!", "?"]: resp += "."
-        # Ensure the response doesn't end on a dangling word like "the" or "and"
+        # Sentence Trimmer (The part you liked!)
         if " " in resp:
-            last_punctuation = max(resp.rfind("."), resp.rfind("!"), resp.rfind("?"))
-            if last_punctuation != -1:
-                resp = resp[:last_punctuation + 1]
-                
+            last_punc = max(resp.rfind("."), resp.rfind("!"), resp.rfind("?"))
+            if last_punc != -1:
+                resp = resp[:last_punc + 1]
+
+        resp = resp.encode("ascii", "ignore").decode().strip()
+
+        if not resp or len(resp) < 5:
+            resp = "The question is irrelevant. My plans for the future do not concern such trivialities."
+
         print(f"\nMr. House: {resp}\n")
 
 if __name__ == "__main__":
