@@ -35,7 +35,7 @@ def train():
 
     # 3. Load combined dataset (game lines + synthetic)
     # If you haven't run generate_synthetic.py yet, use "data/house_v2_clean.csv"
-    dataset = get_house_dataset("data/data/house_v2_clean.csv")
+    dataset = get_house_dataset("data/house_v2_clean.csv")
     dataset_split = dataset.train_test_split(test_size=0.1, seed=3407)
 
     print(f"Train examples: {len(dataset_split['train'])}")
