@@ -142,6 +142,7 @@ def chat():
             )
 
         full_text = tokenizer.decode(outputs[0], skip_special_tokens=False)
+        print("DEBUG:", repr(full_text[-500:]))  # add this line
         resp = parse_response(full_text)
         resp = clean_response(resp)
 
