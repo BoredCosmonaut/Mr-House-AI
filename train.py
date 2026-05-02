@@ -15,7 +15,7 @@ def train():
 
     # 1. Load Model (A100 optimized)
     model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name="unsloth/llama-3-8b",
+        model_name = "unsloth/Meta-Llama-3.1-8B-Instruct",
         max_seq_length=2048,
         dtype=torch.bfloat16,
         load_in_4bit=False,
