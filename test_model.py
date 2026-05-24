@@ -22,8 +22,7 @@ LOOKUP_TRIGGERS = [
 ]
 
 def needs_lookup(text: str) -> bool:
-    lower = text.lower()
-    return any(trigger in lower for trigger in LOOKUP_TRIGGERS)
+    return False  # disable search for now
 
 def web_search(query: str) -> str:
     """Search DuckDuckGo and return a brief summary of top results."""
