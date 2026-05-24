@@ -4,7 +4,7 @@ import warnings
 import os
 import logging
 from unsloth import FastLanguageModel
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 
 warnings.filterwarnings("ignore")
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"
