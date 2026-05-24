@@ -4,13 +4,55 @@ import warnings
 import os
 import logging
 from unsloth import FastLanguageModel
+from duckduckgo_search import DDGS
 
 warnings.filterwarnings("ignore")
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 logging.getLogger("transformers").setLevel(logging.ERROR)
 
+# ─────────────────────────────────────────────
+# SEARCH CONFIG
+# ─────────────────────────────────────────────
+LOOKUP_TRIGGERS = [
+    "when", "next episode", "next chapter", "rating", "score",
+    "release", "out yet", "announced", "latest", "new chapter",
+    "airing", "coming out", "premiere", "sequel", "season",
+    "review", "metacritic", "imdb", "mal", "worth watching",
+    "should i watch", "should i play", "is it good", "how many episodes"
+]
 
-def load_persona(file_path="persona.txt"):
+def needs_lookup(text: str) -> bool:
+    lower = text.lower()
+    return any(trigger in lower for trigger in LOOKUP_TRIGGERS)
+
+def web_search(query: str) -> str:
+    """Search DuckDuckGo and return a brief summary of top results."""
+    try:
+        with DDGS() as ddgs:
+            results = list(ddgs.text(query, max_results=3))
+        if not results:
+            return ""
+        # Combine top snippets into a brief context block
+        snippets = [r.get("body", "") for r in results if r.get("body")]
+        return " | ".join(snippets[:3])[:600]  # cap at 600 chars
+    except Exception as e:
+        print(f"  [SEARCH ERROR] {e}")
+        return ""
+
+def build_search_query(user_text: str) -> str:
+    """Clean up the user message into a good search query."""
+    # Strip filler phrases that confuse search
+    noise = ["what do you think about", "tell me about", "what is", "do you know", "have you heard of"]
+    query = user_text.lower()
+    for phrase in noise:
+        query = query.replace(phrase, "")
+    return query.strip()
+
+
+# ─────────────────────────────────────────────
+# PERSONA
+# ─────────────────────────────────────────────
+def load_persona(file_path="persona.txt") -> str:
     try:
         with open(file_path, "r", encoding="utf-8") as f:
             persona = f.read().strip()
@@ -26,60 +68,40 @@ def load_persona(file_path="persona.txt"):
     return persona + constraint
 
 
+# ─────────────────────────────────────────────
+# RESPONSE PARSING
+# ─────────────────────────────────────────────
 def parse_response(full_text: str) -> str:
-    """
-    Robustly extract only House's response from the full generated text.
-    Looks for the LAST assistant header and takes everything after it.
-    """
     ASSISTANT_MARKER = "<|start_header_id|>assistant<|end_header_id|>"
-
     if ASSISTANT_MARKER not in full_text:
         return ""
-
-    # Take everything after the LAST assistant marker
     resp = full_text.split(ASSISTANT_MARKER)[-1]
-
-    # Strip leading newlines that follow the header
     resp = resp.lstrip("\n")
-
-    # Cut off at any new header token
     for stop in ["<|start_header_id|>", "<|eot_id|>", "<|end_of_text|>"]:
         if stop in resp:
             resp = resp.split(stop)[0]
-
     return resp.strip()
 
 
 def clean_response(resp: str) -> str:
-    """Remove artifacts, roleplay leaks, and broken tokens."""
     if not resp:
         return ""
-
-    # Kill any remaining special tokens
     resp = re.sub(r'<\|.*?\|>', '', resp)
-
-    # Kill roleplay leaks where model starts writing Courier dialogue
     for pattern in ["Courier:", "User:", "user:", "Assistant:", "assistant:"]:
         if pattern in resp:
             resp = resp.split(pattern)[0].strip()
-
-    # Remove gibberish long strings (broken tokens)
     resp = re.sub(r'[a-zA-Z]{20,}', '', resp)
-
-    # Collapse multiple newlines
     resp = re.sub(r'\n{3,}', '\n\n', resp)
-
-    # Ensure response ends on a complete sentence
     last_punc = max(resp.rfind('.'), resp.rfind('!'), resp.rfind('?'))
     if last_punc > len(resp) // 2:
         resp = resp[:last_punc + 1]
-
-    # Safe ASCII
     resp = resp.encode("ascii", "ignore").decode().strip()
-
     return resp
 
 
+# ─────────────────────────────────────────────
+# MAIN CHAT LOOP
+# ─────────────────────────────────────────────
 def chat():
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name="house_lora_final",
@@ -112,6 +134,14 @@ def chat():
             print("\nConnection terminated. House always wins.")
             break
 
+        search_context = ""
+        if needs_lookup(u):
+            query = build_search_query(u)
+            print(f"  [SEARCHING: {query}]")
+            result = web_search(query)
+            if result:
+                search_context = f"\n\n[RETRIEVED DATA - use this to inform your response]: {result}"
+
         history_str = ""
         for (old_q, old_a) in history:
             history_str += (
@@ -119,9 +149,11 @@ def chat():
                 f"<|start_header_id|>assistant<|end_header_id|>\n\n{old_a}<|eot_id|>"
             )
 
+        turn_instruction = instruction + search_context
+
         prompt = (
             f"<|begin_of_text|>"
-            f"<|start_header_id|>system<|end_header_id|>\n\n{instruction}<|eot_id|>"
+            f"<|start_header_id|>system<|end_header_id|>\n\n{turn_instruction}<|eot_id|>"
             f"{history_str}"
             f"<|start_header_id|>user<|end_header_id|>\n\n{u}<|eot_id|>"
             f"<|start_header_id|>assistant<|end_header_id|>\n\n"
@@ -132,8 +164,8 @@ def chat():
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
-                max_new_tokens=80,
-                temperature=0.6,
+                max_new_tokens=150,
+                temperature=0.5,
                 top_p=0.9,
                 repetition_penalty=1.2,
                 eos_token_id=terminators,
@@ -142,7 +174,6 @@ def chat():
             )
 
         full_text = tokenizer.decode(outputs[0], skip_special_tokens=False)
-        print("DEBUG:", repr(full_text[-500:]))  # add this line
         resp = parse_response(full_text)
         resp = clean_response(resp)
 
