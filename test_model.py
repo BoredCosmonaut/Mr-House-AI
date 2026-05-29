@@ -10,9 +10,7 @@ warnings.filterwarnings("ignore")
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 logging.getLogger("transformers").setLevel(logging.ERROR)
 
-# ─────────────────────────────────────────────
-# SEARCH CONFIG
-# ─────────────────────────────────────────────
+
 LOOKUP_TRIGGERS = [
     "when", "next episode", "next chapter", "rating", "score",
     "release", "out yet", "announced", "latest", "new chapter",
@@ -22,25 +20,36 @@ LOOKUP_TRIGGERS = [
 ]
 
 def needs_lookup(text: str) -> bool:
-    return False  # disable search for now
+    lower = text.lower()
+    return any(trigger in lower for trigger in LOOKUP_TRIGGERS)
 
 def web_search(query: str) -> str:
-    """Search DuckDuckGo and return a brief summary of top results."""
+    """Search DuckDuckGo and return a single clean summary sentence."""
     try:
         with DDGS() as ddgs:
-            results = list(ddgs.text(query, max_results=3))
+            results = list(ddgs.text(query, max_results=5))
         if not results:
             return ""
-        # Combine top snippets into a brief context block
-        snippets = [r.get("body", "") for r in results if r.get("body")]
-        return " | ".join(snippets[:3])[:600]  # cap at 600 chars
+
+        snippets = [r.get("body", "").strip() for r in results if r.get("body")]
+        if not snippets:
+            return ""
+
+        priority = [s for s in snippets if any(
+            word in s.lower() for word in ["release", "date", "episode", "season", "rating", "score", "announced", "confirmed", "premieres"]
+        )]
+        best = priority[0] if priority else snippets[0]
+
+        sentences = re.split(r'(?<=[.!?])\s+', best.strip())
+        summary = " ".join(sentences[:2])[:250]
+        return summary
+
     except Exception as e:
         print(f"  [SEARCH ERROR] {e}")
         return ""
 
 def build_search_query(user_text: str) -> str:
     """Clean up the user message into a good search query."""
-    # Strip filler phrases that confuse search
     noise = ["what do you think about", "tell me about", "what is", "do you know", "have you heard of"]
     query = user_text.lower()
     for phrase in noise:
@@ -48,9 +57,7 @@ def build_search_query(user_text: str) -> str:
     return query.strip()
 
 
-# ─────────────────────────────────────────────
-# PERSONA
-# ─────────────────────────────────────────────
+
 def load_persona(file_path="persona.txt") -> str:
     try:
         with open(file_path, "r", encoding="utf-8") as f:
@@ -67,9 +74,7 @@ def load_persona(file_path="persona.txt") -> str:
     return persona + constraint
 
 
-# ─────────────────────────────────────────────
-# RESPONSE PARSING
-# ─────────────────────────────────────────────
+
 def parse_response(full_text: str) -> str:
     ASSISTANT_MARKER = "<|start_header_id|>assistant<|end_header_id|>"
     if ASSISTANT_MARKER not in full_text:
@@ -98,9 +103,7 @@ def clean_response(resp: str) -> str:
     return resp
 
 
-# ─────────────────────────────────────────────
-# MAIN CHAT LOOP
-# ─────────────────────────────────────────────
+
 def chat():
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name="house_lora_final",
@@ -133,13 +136,15 @@ def chat():
             print("\nConnection terminated. House always wins.")
             break
 
+
         search_context = ""
         if needs_lookup(u):
             query = build_search_query(u)
             print(f"  [SEARCHING: {query}]")
             result = web_search(query)
             if result:
-                search_context = f"\n\n[RETRIEVED DATA - use this to inform your response]: {result}"
+                
+                search_context = f"\n[CURRENT DATA: {result}]"
 
         history_str = ""
         for (old_q, old_a) in history:
@@ -148,13 +153,14 @@ def chat():
                 f"<|start_header_id|>assistant<|end_header_id|>\n\n{old_a}<|eot_id|>"
             )
 
-        turn_instruction = instruction + search_context
+
+        turn_instruction = instruction
 
         prompt = (
             f"<|begin_of_text|>"
             f"<|start_header_id|>system<|end_header_id|>\n\n{turn_instruction}<|eot_id|>"
             f"{history_str}"
-            f"<|start_header_id|>user<|end_header_id|>\n\n{u}<|eot_id|>"
+            f"<|start_header_id|>user<|end_header_id|>\n\n{u}{search_context}<|eot_id|>"
             f"<|start_header_id|>assistant<|end_header_id|>\n\n"
         )
 

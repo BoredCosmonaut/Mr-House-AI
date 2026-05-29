@@ -3,9 +3,6 @@ import re
 import pandas as pd
 from datasets import Dataset
 
-# ─────────────────────────────────────────────
-# CONSTANTS
-# ─────────────────────────────────────────────
 SKIP_TOPICS = {
     'GREETING', 'FAREWELL', 'GOODBYE', 'ACCEPT', 'REJECT',
     'YES', 'NO', '', 'BARTER', 'ATTACK', 'NAN'
@@ -26,19 +23,17 @@ BAD_PATTERNS = [
 ]
 
 UNICODE_REPLACEMENTS = {
-    '\u2019': "'",    # right single quote
-    '\u2018': "'",    # left single quote
-    '\u201c': '"',    # left double quote
-    '\u201d': '"',    # right double quote
-    '\u2014': '--',   # em dash
-    '\u2013': '-',    # en dash
-    '\u2026': '...',  # ellipsis
+    '\u2019': "'",  
+    '\u2018': "'",    
+    '\u201c': '"',   
+    '\u201d': '"',   
+    '\u2014': '--',   
+    '\u2013': '-',    
+    '\u2026': '...',  
 }
 
 
-# ─────────────────────────────────────────────
-# HELPERS
-# ─────────────────────────────────────────────
+
 def load_persona(path: str = "persona.txt") -> str:
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -55,7 +50,6 @@ def load_persona(path: str = "persona.txt") -> str:
 def clean_unicode(text: str) -> str:
     for char, replacement in UNICODE_REPLACEMENTS.items():
         text = text.replace(char, replacement)
-    # Drop remaining non-ASCII after safe replacements above
     text = text.encode("ascii", "ignore").decode()
     return text
 
@@ -65,12 +59,9 @@ def clean_house_line(line: str) -> str:
         return ""
     # Remove stage directions {scoff} and skill gate tags [Science 50]
     line = re.sub(r'\{.*?\}|\[.*?\]|<\|.*?\|>', '', line)
-    # Remove engine meta-identifiers
     for pattern in BAD_PATTERNS:
         line = re.sub(pattern, '', line, flags=re.IGNORECASE)
-    # Safe unicode handling - preserves em-dashes and ellipses as ASCII
     line = clean_unicode(line)
-    # Collapse whitespace
     line = re.sub(r'\s+', ' ', line).strip()
     return line
 
@@ -84,7 +75,6 @@ def is_valid_user_text(text: str) -> bool:
     lower = text.lower().strip()
     if lower.startswith(SKILL_CHECK_PREFIXES):
         return False
-    # Must have at least 2 real words
     if len(text.split()) < 2:
         return False
     return True
@@ -99,9 +89,7 @@ def build_llama3_example(instruction: str, user_text: str, house_response: str) 
     )
 
 
-# ─────────────────────────────────────────────
-# MAIN DATASET BUILDER
-# ─────────────────────────────────────────────
+
 def get_house_dataset(csv_path: str, persona_path: str = "persona.txt") -> Dataset:
     """
     Load and format Mr. House dialogue CSV into a Llama 3 instruction dataset.
@@ -172,10 +160,7 @@ def get_house_dataset(csv_path: str, persona_path: str = "persona.txt") -> Datas
     return Dataset.from_list(formatted_data)
 
 
-# ─────────────────────────────────────────────
-# QUICK SANITY CHECK
-# Run: python data_loader.py data/house_v2_clean.csv
-# ─────────────────────────────────────────────
+
 if __name__ == "__main__":
     import sys
     csv = sys.argv[1] if len(sys.argv) > 1 else "data/house_v2_clean.csv"
