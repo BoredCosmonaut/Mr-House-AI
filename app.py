@@ -43,7 +43,7 @@ def web_search(query: str) -> str:
     try:
         with DDGS() as ddgs:
             results = list(ddgs.text(query, max_results=5))
-        if not results:
+        if not Redacted:
             return ""
         snippets = [r.get("body", "").strip() for r in results if r.get("body")]
         if not snippets:
@@ -57,7 +57,6 @@ def web_search(query: str) -> str:
     except Exception as e:
         print(f"[SEARCH ERROR] {e}")
         return ""
-
 
 def load_persona(path="persona.txt") -> str:
     try:
@@ -85,14 +84,13 @@ terminators = [
     tokenizer.eos_token_id,
     tokenizer.convert_tokens_to_ids("<|eot_id|>"),
     tokenizer.convert_tokens_to_ids("<|start_header_id|>"),
+    tokenizer.encode("\n\n", add_special_tokens=False)[-1],
 ]
 terminators = [t for t in terminators if t and t != -1]
 
 INSTRUCTION = load_persona()
 history = []
 MAX_HISTORY = 4
-
-
 
 def parse_response(full_text: str) -> str:
     marker = "<|start_header_id|>assistant<|end_header_id|>"
@@ -111,8 +109,12 @@ def clean_response(resp: str) -> str:
     for pattern in ["Courier:", "User:", "user:", "Assistant:", "assistant:"]:
         if pattern in resp:
             resp = resp.split(pattern)[0].strip()
+            
+    # Strict formatting layer: Cut out anything following an accidental line-break split
+    if "\n" in resp:
+        resp = resp.split("\n")[0].strip()
+        
     resp = re.sub(r'[a-zA-Z]{20,}', '', resp)
-    resp = re.sub(r'\n{3,}', '\n\n', resp)
     last_punc = max(resp.rfind('.'), resp.rfind('!'), resp.rfind('?'))
     if last_punc > len(resp) // 2:
         resp = resp[:last_punc + 1]
@@ -120,15 +122,21 @@ def clean_response(resp: str) -> str:
 
 
 
-@app.route('/chat', methods=['POST','OPTIONS'])
+@app.route('/chat', methods=['POST', 'OPTIONS'])
 def chat():
     global history
 
+
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'preflight ok'}), 200
+
     data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Missing request payload'}), 400
+        
     user_text = data.get('message', '').strip()
     if not user_text:
         return jsonify({'error': 'Empty message'}), 400
-
 
     searched = False
     search_query_used = ""
@@ -137,9 +145,8 @@ def chat():
         search_query_used = build_search_query(user_text)
         result = web_search(search_query_used)
         if result:
-            search_context = f"\n[CURRENT DATA: {result}]"
+            search_context = f"\n[MAINFRAME SEARCH DATA RECOVERY: {result}]"
             searched = True
-
 
     history_str = ""
     for (q, a) in history:
@@ -162,7 +169,7 @@ def chat():
         outputs = model.generate(
             **inputs,
             max_new_tokens=150,
-            temperature=0.5,
+            temperature=0.25,
             top_p=0.9,
             repetition_penalty=1.2,
             eos_token_id=terminators,
@@ -177,7 +184,6 @@ def chat():
     if not resp:
         resp = "My calculations suggest this topic is a superfluous distraction."
 
-
     history.append((user_text, resp))
     if len(history) > MAX_HISTORY:
         history.pop(0)
@@ -188,14 +194,18 @@ def chat():
         'search_query': search_query_used
     })
 
-@app.route('/reset', methods=['POST','OPTIONS'])
+@app.route('/reset', methods=['POST', 'OPTIONS'])
 def reset():
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'preflight ok'}), 200
     global history
     history = []
     return jsonify({'status': 'History cleared.'})
 
-@app.route('/health', methods=['GET','OPTIONS'])
+@app.route('/health', methods=['GET', 'OPTIONS'])
 def health():
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'preflight ok'}), 200
     return jsonify({'status': 'online', 'model': 'house_lora_final'})
 
 
