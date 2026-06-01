@@ -1,0 +1,5 @@
+min-package-age=10
+audit-level=moderate
+ignore-scripts=false
+save-exact=true
+package-lock=true
