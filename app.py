@@ -1,11 +1,4 @@
-"""
-app.py
-──────
-Flask backend that wraps test_model.py as a REST API.
-Run in Colab:
-    !pip install flask flask-cors ddgs
-    !python app.py
-"""
+
 
 import torch
 import re
@@ -24,9 +17,6 @@ logging.getLogger("transformers").setLevel(logging.ERROR)
 app = Flask(__name__)
 CORS(app)  # Allow the Vue frontend to call this API
 
-# ─────────────────────────────────────────────
-# SEARCH
-# ─────────────────────────────────────────────
 LOOKUP_TRIGGERS = [
     "when", "next episode", "next chapter", "rating", "score",
     "release", "out yet", "announced", "latest", "new chapter",
@@ -65,9 +55,6 @@ def web_search(query: str) -> str:
         return ""
 
 
-# ─────────────────────────────────────────────
-# MODEL (loaded once at startup)
-# ─────────────────────────────────────────────
 def load_persona(path="persona.txt") -> str:
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -83,7 +70,7 @@ def load_persona(path="persona.txt") -> str:
 
 print("Loading model...")
 model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name="house_lora_final",
+    model_name="../house_lora_final",
     max_seq_length=2048,
     dtype=torch.bfloat16,
     load_in_4bit=False,
@@ -98,9 +85,6 @@ terminators = [
 terminators = [t for t in terminators if t and t != -1]
 
 INSTRUCTION = load_persona()
-print("Model ready.")
-
-# Per-session conversation history (simple in-memory, resets on server restart)
 history = []
 MAX_HISTORY = 4
 
