@@ -15,8 +15,8 @@ os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 logging.getLogger("transformers").setLevel(logging.ERROR)
 
 app = Flask(__name__)
-CORS(app)  # Allow the Vue frontend to call this API
-
+# Change CORS(app) to allow the bypass headers safely
+CORS(app, resources={r"/*": {"origins": "*", "allow_headers": "*"}})
 LOOKUP_TRIGGERS = [
     "when", "next episode", "next chapter", "rating", "score",
     "release", "out yet", "announced", "latest", "new chapter",
