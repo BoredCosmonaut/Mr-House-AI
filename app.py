@@ -1,5 +1,3 @@
-
-
 import torch
 import re
 import warnings
@@ -15,8 +13,14 @@ os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 logging.getLogger("transformers").setLevel(logging.ERROR)
 
 app = Flask(__name__)
-# Change CORS(app) to allow the bypass headers safely
-CORS(app, resources={r"/*": {"origins": "*", "allow_headers": "*"}})
+
+
+CORS(app, resources={r"/*": {
+    "origins": "*",
+    "allow_headers": "*",
+    "methods": ["GET", "POST", "OPTIONS"]
+}})
+
 LOOKUP_TRIGGERS = [
     "when", "next episode", "next chapter", "rating", "score",
     "release", "out yet", "announced", "latest", "new chapter",
@@ -89,9 +93,7 @@ history = []
 MAX_HISTORY = 4
 
 
-# ─────────────────────────────────────────────
-# RESPONSE HELPERS
-# ─────────────────────────────────────────────
+
 def parse_response(full_text: str) -> str:
     marker = "<|start_header_id|>assistant<|end_header_id|>"
     if marker not in full_text:
@@ -117,10 +119,8 @@ def clean_response(resp: str) -> str:
     return resp.encode("ascii", "ignore").decode().strip()
 
 
-# ─────────────────────────────────────────────
-# ROUTES
-# ─────────────────────────────────────────────
-@app.route('/chat', methods=['POST'])
+
+@app.route('/chat', methods=['POST','OPTIONS'])
 def chat():
     global history
 
@@ -129,7 +129,7 @@ def chat():
     if not user_text:
         return jsonify({'error': 'Empty message'}), 400
 
-    # Search
+
     searched = False
     search_query_used = ""
     search_context = ""
@@ -140,7 +140,7 @@ def chat():
             search_context = f"\n[CURRENT DATA: {result}]"
             searched = True
 
-    # Build history string
+
     history_str = ""
     for (q, a) in history:
         history_str += (
@@ -177,7 +177,7 @@ def chat():
     if not resp:
         resp = "My calculations suggest this topic is a superfluous distraction."
 
-    # Update history
+
     history.append((user_text, resp))
     if len(history) > MAX_HISTORY:
         history.pop(0)
@@ -188,13 +188,13 @@ def chat():
         'search_query': search_query_used
     })
 
-@app.route('/reset', methods=['POST'])
+@app.route('/reset', methods=['POST','OPTIONS'])
 def reset():
     global history
     history = []
     return jsonify({'status': 'History cleared.'})
 
-@app.route('/health', methods=['GET'])
+@app.route('/health', methods=['GET','OPTIONS'])
 def health():
     return jsonify({'status': 'online', 'model': 'house_lora_final'})
 
