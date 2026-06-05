@@ -14,11 +14,12 @@ logging.getLogger("transformers").setLevel(logging.ERROR)
 
 app = Flask(__name__)
 
-
+# CORS ayarları hem ngrok hem de modern tarayıcı standartlarına uyarlandı
 CORS(app, resources={r"/*": {
     "origins": "*",
-    "allow_headers": "*",
-    "methods": ["GET", "POST", "OPTIONS"]
+    "allow_headers": ["Content-Type", "Authorization", "ngrok-skip-browser-warning"],
+    "methods": ["GET", "POST", "OPTIONS"],
+    "expose_headers": ["Content-Type", "Authorization"]
 }})
 
 LOOKUP_TRIGGERS = [
@@ -43,7 +44,8 @@ def web_search(query: str) -> str:
     try:
         with DDGS() as ddgs:
             results = list(ddgs.text(query, max_results=5))
-        if not Redacted:
+        # DÜZELTME: Tanımlanmamış 'Redacted' değişkeni yerine sonuç kontrolü getirildi
+        if not results:
             return ""
         snippets = [r.get("body", "").strip() for r in results if r.get("body")]
         if not snippets:
@@ -110,7 +112,6 @@ def clean_response(resp: str) -> str:
         if pattern in resp:
             resp = resp.split(pattern)[0].strip()
             
-    # Strict formatting layer: Cut out anything following an accidental line-break split
     if "\n" in resp:
         resp = resp.split("\n")[0].strip()
         
@@ -121,11 +122,18 @@ def clean_response(resp: str) -> str:
     return resp.encode("ascii", "ignore").decode().strip()
 
 
+# DÜZELTME: Tüm HTTP yanıtlarına CORS başlıklarını zorla enjekte eden kanca
+@app.after_request
+def apply_cors_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, ngrok-skip-browser-warning"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    return response
+
 
 @app.route('/chat', methods=['POST', 'OPTIONS'])
 def chat():
     global history
-
 
     if request.method == 'OPTIONS':
         return jsonify({'status': 'preflight ok'}), 200
