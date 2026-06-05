@@ -18,9 +18,8 @@
   <div class="app">
 
     <div class="header">
-      <div class="header-title">Lucky 38 Mainframe</div>
+      <div class="header-title">Lucky 38</div>
       <div class="status-row">
-        <span><span class="status-dot"></span>NETWORK ACTIVE</span>
       </div>
     </div>
 
@@ -63,11 +62,11 @@
         v-model="userInput"
         @keydown.enter="sendMessage"
         :disabled="loading"
-        placeholder="Speak your business..."
+        placeholder="What do you want to say?"
         autofocus
       />
       <button class="send-btn" @click="sendMessage" :disabled="loading || !userInput.trim()">
-        TRANSMIT
+        Send
       </button>
     </div>
 
@@ -94,7 +93,7 @@ createApp({
     const searchQuery = ref('');
     const chatWindow = ref(null);
 
-    const API_URL = 'https://f3fb-35-247-137-203.ngrok-free.app/chat';  
+    const API_URL = 'https://d487-35-247-137-203.ngrok-free.app/chat';  
 
     async function sendMessage() {
       const text = userInput.value.trim();

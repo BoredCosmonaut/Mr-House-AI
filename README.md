@@ -20,8 +20,6 @@ Mr-House-AI/
 ├── train.py                # LoRA fine-tuning script
 ├── test_model.py           # CLI chat interface with web search
 ├── persona.txt             # Mr. House system prompt and persona rules
-├── merge_datasets.py       # Merges game data with synthetic data
-├── generate_synthetic.py   # Generates synthetic training examples (requires Anthropic API)
 ├── data/
 │   └── house_v2_clean.csv  # Extracted Mr. House dialogue from Fallout: New Vegas
 └── src/
