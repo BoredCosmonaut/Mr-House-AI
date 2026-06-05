@@ -3,10 +3,13 @@ import re
 import warnings
 import os
 import logging
+import threading
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from ddgs import DDGS
+from duckduckgo_search import DDGS 
 from unsloth import FastLanguageModel
+
+
 
 warnings.filterwarnings("ignore")
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"
@@ -14,7 +17,7 @@ logging.getLogger("transformers").setLevel(logging.ERROR)
 
 app = Flask(__name__)
 
-# CORS ayarları hem ngrok hem de modern tarayıcı standartlarına uyarlandı
+
 CORS(app, resources={r"/*": {
     "origins": "*",
     "allow_headers": ["Content-Type", "Authorization", "ngrok-skip-browser-warning"],
@@ -44,7 +47,6 @@ def web_search(query: str) -> str:
     try:
         with DDGS() as ddgs:
             results = list(ddgs.text(query, max_results=5))
-        # DÜZELTME: Tanımlanmamış 'Redacted' değişkeni yerine sonuç kontrolü getirildi
         if not results:
             return ""
         snippets = [r.get("body", "").strip() for r in results if r.get("body")]
@@ -122,7 +124,7 @@ def clean_response(resp: str) -> str:
     return resp.encode("ascii", "ignore").decode().strip()
 
 
-# DÜZELTME: Tüm HTTP yanıtlarına CORS başlıklarını zorla enjekte eden kanca
+
 @app.after_request
 def apply_cors_headers(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
