@@ -77,7 +77,7 @@ def load_persona(path="persona.txt") -> str:
 
 print("Loading model...")
 model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name="../house_lora_final",
+    model_name="house_lora_final",
     max_seq_length=2048,
     dtype=torch.bfloat16,
     load_in_4bit=False,
